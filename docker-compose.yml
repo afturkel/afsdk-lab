@@ -1,0 +1,56 @@
+# SERVICES CONFIGURATION
+services:
+    # DATABASE SERVICE
+    db:
+        image: postgres:16-alpine
+        restart: unless-stopped
+        # ENVIRONMENT CONFIGURATION - VARIABLES
+        environment:
+            POSTGRES_DB: nextcloud
+            POSTGRES_USER: nextcloud
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        # VOLUME CREATOR TO NOT LOSE FILES IN CASE OF CRASH OR REMOVAL
+        volumes:
+            - ./db:/var/lib/postgresql/data
+
+    # REDIS : CACHE TO IMPROVE USER EXPERIENCE
+    redis:
+        image: redis:alpine
+        restart: unless-stopped
+
+    # NEXTCLOUD SERVICE
+    app:
+        # RUNNING NEXTCLOUD WITH APACHE SERVER
+        image: nextcloud:apache
+        restart: unless-stopped
+        # NEXTCLOUD RUNNING AFTER DB AND REDIS
+        depends_on: [db, redis]
+        # PORT ADDRESS ATTRIBUTION
+        ports:
+            - "8080:80"
+        # VARIABLE ATTRIBUTION FOR NEXTCLOUD
+        environment:
+            # POSTGRESQL VARIABLES
+            POSTGRES_HOST: db
+            POSTGRES_DB: nextcloud
+            POSTGRES_USER: nextcloud
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            # REDIS
+            REDIS_HOST: redis
+            # CREATION OF ADMIN ACCOUNT FOR NEXTCLOUD
+            NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+            NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+            NEXTCLOUD_TRUSTED_DOMAINS: "localhost ${SERVER_IP}"
+        # FILES AND CONFIGS STORAGE ATTRIBUTION
+        volumes:
+            - ./html:/var/www/html
+
+    # CRON SERVICE
+    cron:
+        # IS USED TO REMOVE UNUSED NOTIFICATIONS AND TASKS ETC.
+        image: nextcloud:apache
+        restart: unless-stopped
+        depends_on: [app]
+        entrypoint: /cron.sh
+        volumes:
+            - ./html:/var/www/html
